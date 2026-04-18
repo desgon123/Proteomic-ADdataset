@@ -1,0 +1,722 @@
+---
+title: "ProteomicAnalysis_UnwinECandHIPdata"
+author: "DG"
+date: "2026-04-17"
+output: html_document
+toc: true
+toc_depth: 2
+theme: flatly
+---
+#The code below demostrates analysis of protein abundance values for AD and control samples. Proteomic data were obtained from a publicly available Alzheimer's disease meta-analysis dataset, specifically the Unwin et al. cohort (entorhinal cortex and hippocampus). 
+---
+## 1.1 Install Packages 
+install.packages("BiocManager")
+
+BiocManager::install("clusterProfiler","limma","org.Hs.eg.db")
+
+install.packages(c("ggplot2", "dplyr", "ggrepel"))
+
+install.packages("VennDiagram")
+
+install.packages("futile.logger")
+
+install.packages("pheatmap")
+
+## 1.2 Load Libraries 
+library(clusterProfiler)
+
+library(org.Hs.eg.db)
+
+library(dplyr)
+
+library(ggplot2)
+
+library(ggrepel)  # Optional but recommended for clean labeling
+
+library(tibble)
+
+library(VennDiagram)
+
+library(grid)
+library(pheatmap)
+
+## 2. Data Preprocessing
+##Load Data
+
+### download data (data17_UnwinHIP_formatted.txt and data18_UnwinEC_formatted.txt) from a github repository (https://github.com/hazhay/Meta-analysis_AD/tree/main/Data)
+
+unwin_ec <- read.delim("data18_UnwinEC_formatted.txt", stringsAsFactors = FALSE, check.names = FALSE)
+
+unwin_hip <- read.delim("data17_UnwinHIP_formatted.txt", stringsAsFactors = FALSE, check.names = FALSE)
+
+## 2.1. Inspect Data
+head(unwin_ec)
+
+dim(unwin_ec)
+
+head(unwin_hip)
+
+dim(unwin_hip)
+
+## 2.2. Check NA levels per sample
+colSums(is.na(unwin_ec))
+
+colSums(is.na(unwin_hip))
+
+## 2.3. Check distribution across all samples
+boxplot(unwin_ec, las=2, main="Sample distributions")
+
+## Sample Distributions EC ##
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/SampleDistribution-Unwin_EC.png")
+```
+<img src="`r img_data`" style="width:70%; display:block; margin:auto;" />
+
+
+boxplot(unwin_hip, las=2, main="Sample distributions")
+
+## Sample Distributions HIP ##
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data1 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/SampleDistribution_Unwin-HIP.png")
+```
+<img src="`r img_data1`" style="width:70%; display:block; margin:auto;" />
+
+## 2.4. Compare control vs AD – biological check
+boxplot(unwin_ec[, group1 == "Control"],
+        unwin_ec[, group1 == "AD"],
+        names=c("Control","AD"))
+        
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data2 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/Boxplot-Unwin-EC.png")
+```
+<img src="`r img_data2`" style="width:70%; display:block; margin:auto;" />
+
+boxplot(unwin_ec[, group2 == "Control"],
+        unwin_ec[, group2 == "AD"],
+        names=c("Control","AD"))
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data3 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/Boxplot-Unwin-HIP.png")
+```
+<img src="`r img_data3`" style="width:70%; display:block; margin:auto;" />
+
+## 2.5. Confirm the raw data structure
+readLines("data18_UnwinEC_formatted.txt", n = 2)
+
+readLines("data17_UnwinHIP_formatted.txt", n = 2)
+
+cat(readLines("data18_UnwinEC_formatted.txt", n = 1))
+
+cat(readLines("data17_UnwinHIP_formatted.txt", n = 1))
+
+## 2.6.1. Force a strict delimiter parser
+unwin_ec <- read.table(
+  "data18_UnwinEC_formatted.txt",
+  header = TRUE,
+  sep = "",          # auto-detect ANY whitespace 
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+
+
+unwin_hip <- read.table(
+  "data17_UnwinHIP_formatted.txt",
+  header = TRUE,
+  sep = "",          # auto-detect ANY whitespace 
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+
+## 2.6.2. Ensure proper grouping
+group1 <- ifelse(grepl("^C", colnames(unwin_ec)), "Control",
++                  ifelse(grepl("^AD", colnames(unwin_ec)), "AD", NA))
+
+group2 <- ifelse(grepl("^C", colnames(unwin_hip)), "Control",
++                  ifelse(grepl("^AD", colnames(unwin_hip)), "AD", NA))
+
+
+## 2.6.3. Verify proper grouping
+table(group1)
+
+dim(ec)
+
+length (group1)
+
+table(group2)
+
+dim(hip)
+
+length (group 2)
+
+## 2.7. Run Principal Component Analysis (PCA) - QC step
+
+pca <- prcomp(t(ec), scale.=TRUE)
+
+plot(pca$x[,1], pca$x[,2],
+     col=group1,
+     pch=19,
+     xlab="PC1",
+     ylab="PC2",
+     main="PCA - Entorhinal Cortex")
+
+legend("topright", legend=levels(group1), col=1:2, pch=19)
+
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data4 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/PCA-ECdataset.png")
+```
+<img src="`r img_data4`" style="width:70%; display:block; margin:auto;" />
+
+pca <- prcomp(t(hip), scale.=TRUE)
+
+plot(pca$x[,1], pca$x[,2],
+     col=group2,
+     pch=19,
+     xlab="PC1",
+     ylab="PC2",
+     main="PCA - Hippocampus")
+
+legend("topright", legend=levels(group2), col=1:2, pch=19)
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data5 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/PCA-HIPdataset.png")
+```
+<img src="`r img_data5`" style="width:70%; display:block; margin:auto;" />
+
+## 3. Limma Analysis
+
+## 3.1. Design matrix
+design <- model.matrix(~group1)
+
+design <- model.matrix(~group2)
+
+## 3.2. Fit model
+fit <- lmFit(ec, design)
+
+fit <- eBayes(fit)
+
+fit <- lmFit(hip, design)
+
+fit <- eBayes(fit)
+
+## 3.3. Extract Results
+results_ec <- topTable(fit, coef=2, number=Inf)
+
+head(results_ec)
+
+results_hip <- topTable(fit, coef=2, number=Inf)
+
+head(results_hip)
+
+## 3.4. Save Results 
+write.csv(data.frame(Gene = rownames(results), results), "limma_results_ec.csv", row.names = FALSE)
+
+write.csv(data.frame(Gene = rownames(results), results), "limma_results_hip.csv", row.names = FALSE)
+
+## 4. Draw plots, graphs and heatmaps
+
+## 4.1. Volcano Plot for EC dataset
+results_ec$significant <- results_ec$adj.P.Val < 0.05
+
+ggplot(results_ec, aes(x=logFC, y=-log10(P.Value))) +
+  geom_point(aes(color=significant)) +
+  scale_color_manual(values=c("grey", "red")) +
+  theme_minimal() +
+  ggtitle("Volcano Plot - EC")
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data6 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/VolcanoPlot-ECdataset.png")
+```
+<img src="`r img_data6`" style="width:70%; display:block; margin:auto;" />
+
+
+## 4.2. Volcano Plot for HIP dataset
+results_hip$significant <- results_hip$adj.P.Val < 0.05
+
+ggplot(results_hip, aes(x=logFC, y=-log10(P.Value))) +
+  geom_point(aes(color=significant)) +
+  scale_color_manual(values=c("grey", "blue")) +
+  theme_minimal() +
+  ggtitle("Volcano Plot - HIP")
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data7 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/VolcanoPlot-HIPdataset.png")
+```
+<img src="`r img_data7`" style="width:70%; display:block; margin:auto;" />
+
+## 4.3. Volcano Plot for EC dataset – TOP Proteins
+ggplot(results_ec, aes(x = logFC, y = -log10(P.Value))) +
+  geom_point(aes(color = significant)) +
+  geom_text_repel(
+    data = top_genes,
+    aes(label = rownames(top_genes)),
+    size = 3
+  ) +
+  theme_minimal() +
+  ggtitle("Volcano Plot - Differentially Abundant Proteins (EC)")
+  
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data8 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/VolcanoPlot-ECdataset_TopProteins_v2.png")
+```
+<img src="`r img_data8`" style="width:70%; display:block; margin:auto;" />
+  
+## 4.4. Volcano Plot for HIP dataset – TOP Proteins
+ggplot(results_hip, aes(x = logFC, y = -log10(P.Value))) +
+  geom_point(aes(color = significant)) +
+  geom_text_repel(
+    data = top_genes,
+    aes(label = rownames(top_genes)),
+    size = 3
+  ) +
+  theme_minimal() +
+  ggtitle("Volcano Plot - Differentially Abundant Proteins (HIP)")
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data9 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/VolcanoPlot-HIPdataset_TopProteins_v2.png")
+```
+<img src="`r img_data9`" style="width:70%; display:block; margin:auto;" />
+
+## 4.5. Volcano Plots (significance thresholds)
+
+#Step 1 — Define thresholds
+pval_cutoff <- 0.05
+
+logfc_cutoff <- 1
+
+#Step 2 — Classify proteins
+results_ec$category <- "Not Significant"
+
+results_ec$category[results_ec$adj.P.Val < pval_cutoff & results_ec$logFC > logfc_cutoff] <- "Upregulated"
+results_ec$category[results_ec$adj.P.Val < pval_cutoff & results_ec$logFC < -logfc_cutoff] <- "Downregulated"
+
+results_hip$category <- "Not Significant"
+
+results_hip$category[results_hip$adj.P.Val < pval_cutoff & results_hip$logFC > logfc_cutoff] <- "Upregulated"
+results_hip$category[results_hip$adj.P.Val < pval_cutoff & results_hip$logFC < -logfc_cutoff] <- "Downregulated"
+
+#Step 3 — Select top proteins to label
+top_proteins_ec <- results_ec[order(results_ec$adj.P.Val), ]
+top_proteins_ec <- top_proteins_ec[1:10, , drop = FALSE]
+
+top_proteins_hip<- results_hip[order(results_hip$adj.P.Val), ]
+top_proteins_hip <- top_proteins_hip[1:10, , drop = FALSE]
+
+#Step 4 — Draw Volcano Plots 
+
+# Volcano Plot for EC dataset - TOP Proteins
+
+ggplot(results_ec, aes(x = logFC, y = -log10(P.Value))) +
+  
+  # Points
+  geom_point(aes(color = category), alpha = 0.7) +
+  
+  # Color scheme
+  scale_color_manual(values = c(
+    "Upregulated" = "red",
+    "Downregulated" = "blue",
+    "Not Significant" = "grey"
+  )) +
+  
+  # Threshold lines
+  geom_vline(xintercept = c(-logfc_cutoff, logfc_cutoff), 
+             linetype = "dashed", color = "black") +
+  
+  geom_hline(yintercept = -log10(pval_cutoff), 
+             linetype = "dashed", color = "black") +
+  
+  # Labels
+  geom_text_repel(
+    data = top_proteins_ec,
+    aes(label = rownames(top_proteins_ec)),  # or Gene if using CSV
+    size = 3,
+    max.overlaps = 20
+  ) +
+  
+  # Theme
+  theme_minimal(base_size = 14) +
+  
+  # Labels
+  labs(
+    title = "Volcano Plot - Differentially Abundant Proteins (EC)",
+    x = "Log2 Fold Change",
+    y = "-log10(p-value)",
+    color = "Category"
+  )
+  
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data10 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/VolcanoPlot-DAP-ECdataset.png")
+```
+<img src="`r img_data10`" style="width:70%; display:block; margin:auto;" />
+  
+# Volcano Plot for HIP dataset – TOP Proteins 
+
+library(ggplot2)
+library(ggrepel)
+
+ggplot(results_hip, aes(x = logFC, y = -log10(P.Value))) +
+  
+  # Points
+  geom_point(aes(color = category), alpha = 0.7) +
+  
+  # Color scheme
+  scale_color_manual(values = c(
+    "Upregulated" = "red",
+    "Downregulated" = "blue",
+    "Not Significant" = "grey"
+  )) +
+  
+  # Threshold lines
+  geom_vline(xintercept = c(-logfc_cutoff, logfc_cutoff), 
+             linetype = "dashed", color = "black") +
+  
+  geom_hline(yintercept = -log10(pval_cutoff), 
+             linetype = "dashed", color = "black") +
+  
+  # Labels
+  geom_text_repel(
+    data = top_proteins_hip,
+    aes(label = rownames(top_proteins_hip)),  # or Gene if using CSV
+    size = 3,
+    max.overlaps = 20
+  ) +
+  
+  # Theme
+  theme_minimal(base_size = 14) +
+  
+  # Labels
+  labs(
+    title = "Volcano Plot - Differentially Abundant Proteins (HIP)",
+    x = "Log2 Fold Change",
+    y = "-log10(p-value)",
+    color = "Category"
+  )
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data11 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/VolcanoPlot-DAP-HIPdataset.png")
+```
+<img src="`r img_data11`" style="width:70%; display:block; margin:auto;" />
+
+## 4.6.1. Compare EC vs HIP datasets
+
+plot(results_ec[common,"logFC"],
+     results_hip[common,"logFC"])
+abline(0,1)
+
+# [1] 0.6939343
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data12 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/ECvsHIP-comparison.png")
+```
+<img src="`r img_data12`" style="width:70%; display:block; margin:auto;" />
+
+## 4.6.2. Define shared significant proteins
+sig_ec <- rownames(results_ec[results_ec$adj.P.Val < 0.05, ])
+sig_hip <- rownames(results_hip[results_hip$adj.P.Val < 0.05, ])
+
+shared <- intersect(sig_ec, sig_hip)
+
+length(shared)
+
+## 4.6.3. Build plotting dataframe
+common <- intersect(rownames(results_ec), rownames(results_hip))
+
+plot_df <- data.frame(
+  protein = common,
+  logFC_EC = results_ec[common, "logFC"],
+  logFC_HIP = results_hip[common, "logFC"]
+)
+
+plot_df$category <- ifelse(plot_df$protein %in% shared,
+                           "Shared Significant",
+                           "Other")
+
+## 4.6.4. Plot comparison
+
+ggplot(plot_df, aes(x = logFC_EC, y = logFC_HIP)) +
+  geom_point(aes(color = category), alpha = 0.6) +
+  
+  scale_color_manual(values = c(
+    "Shared Significant" = "red",
+    "Other" = "grey"
+  )) +
+  
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  
+  theme_minimal(base_size = 14) +
+  
+  labs(
+    title = "EC vs HIP Protein Fold-Change Correlation",
+    x = "EC log2 Fold Change",
+    y = "HIP log2 Fold Change",
+    color = "Category"
+  )
+
+## 4.6.5. Plot comparison with top shared proteins highlighted
+
+top_shared <- plot_df[plot_df$protein %in% shared, ]
+top_shared <- top_shared[order(-abs(top_shared$logFC_EC)), ][1:10, ]
+
+ggplot(plot_df, aes(x = logFC_EC, y = logFC_HIP)) +
+  geom_point(aes(color = category), alpha = 0.6) +
+  
+  geom_text_repel(
+    data = top_shared,
+    aes(label = protein),
+    size = 3
+  ) +
+  
+  scale_color_manual(values = c(
+    "Shared Significant" = "red",
+    "Other" = "grey"
+  )) +
+  
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  
+  theme_minimal(base_size = 14) +
+  
+  labs(
+    title = "Shared Differential Proteins (EC vs HIP)",
+    x = "EC log2 Fold Change",
+    y = "HIP log2 Fold Change"
+  )
+  
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data13 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/SharedDAP-ECvsHIP.png")
+```
+<img src="`r img_data13`" style="width:70%; display:block; margin:auto;" />
+  
+## 4.6.6. Quantify Overlap
+length(shared)
+
+#[1] 32
+
+#proportion of shared signal
+length(shared) / length(common)
+
+#[1] 0.01369863
+
+## 5. Pathway Enrichment Analysis
+
+## 5.1. Extract Significant Proteins
+sig_p <- 0.05
+sig_lfc <- 0.25
+
+ec_sig <- results_ec %>%
+  as.data.frame() %>%
+  rownames_to_column("uniprot") %>%
+  filter(adj.P.Val < sig_p, abs(logFC) > sig_lfc)
+
+hip_sig <- results_hip %>%
+  as.data.frame() %>%
+  rownames_to_column("uniprot") %>%
+  filter(adj.P.Val < sig_p, abs(logFC) > sig_lfc)
+
+## 5.2. Map UniProt → Entrez IDs
+
+ec_genes <- bitr(
+  ec_sig$uniprot,
+  fromType = "UNIPROT",
+  toType   = "ENTREZID",
+  OrgDb    = org.Hs.eg.db
+)
+
+hip_genes <- bitr(
+  hip_sig$uniprot,
+  fromType = "UNIPROT",
+  toType   = "ENTREZID",
+  OrgDb    = org.Hs.eg.db
+)
+
+## 5.3. Check mapping - QC step
+
+nrow(ec_genes)
+
+#[1] 296
+
+nrow(hip_genes)
+#[1] 53
+
+# These numbers suggest that both groups will be relatively stable for GO analysis, but KEGG is expected to be very sparse for the hip dataset. Therefore, continue with GO analysis.
+
+##Additional QC to check protein number before mapping
+
+nrow(ec_sig)
+#[1] 301
+
+nrow(hip_sig)
+#[1] 52
+
+nrow(ec_genes)
+#[1] 296
+
+nrow(hip_genes)
+#[1] 53
+
+##This shows that there is good mapping coverage. It's just that the HIP dataset has a much smaller DE signal than EC
+
+## 5.4. Compare clusters
+gene_list <- list(
+  EC  = ec_genes$ENTREZID,
+  HIP = hip_genes$ENTREZID
+)
+
+cc_go <- compareCluster(
+  geneCluster = gene_list,
+  fun = "enrichGO",
+  OrgDb = org.Hs.eg.db,
+  ont = "BP",
+  keyType = "ENTREZID"
+)
+
+## 5.5. Create Dotplot
+dotplot(cc_go, showCategory = 15, title = "GO Biological Process: EC vs HIP")
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data14 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/GObiologicalProcess_ECvsHIP_v1.png")
+```
+<img src="`r img_data14`" style="width:70%; display:block; margin:auto;" />
+  
+## 5.6. Identify shared pathways between EC and HIP and plot them
+
+#Step 1 — Get the 9 shared pathways
+ec_df  <- as.data.frame(ec_go)
+hip_df <- as.data.frame(hip_go)
+
+shared_ids <- intersect(ec_df$ID, hip_df$ID)
+
+shared_df <- ec_df[ec_df$ID %in% shared_ids,
+                   c("ID", "Description", "p.adjust")]
+
+#Step 2 — Make sure it’s clean 
+shared_df <- na.omit(shared_df)
+shared_df <- shared_df[order(shared_df$p.adjust), ]
+
+#Step 3 — Convert to grid table
+tbl <- gridExtra::tableGrob(shared_df)
+
+#Step 4 — Save as PNG 
+png("shared_pathways.png",
+    width = 2200,
+    height = 1200,
+    res = 300)
+
+grid::grid.draw(tbl)
+
+dev.off()
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data15 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/shared_pathways.png")
+```
+<img src="`r img_data15`" style="width:70%; display:block; margin:auto;" />
+
+## 6. Visualisations (EC-HIP comparison)
+##6.1. Heatmap 
+
+#STEP 1 — Build combined pathway table by merging EC + HIP enrichment results
+ec_df  <- as.data.frame(ec_go)
+hip_df <- as.data.frame(hip_go)
+##Keep only shared pathways 
+shared_ids <- intersect(ec_df$ID, hip_df$ID)
+
+ec_shared <- ec_df[ec_df$ID %in% shared_ids, ]
+hip_shared <- hip_df[hip_df$ID %in% shared_ids, ]
+
+#STEP 2 — Build heatmap matrix by using −log10(p.adjust) 
+ec_shared$score  <- -log10(ec_shared$p.adjust)
+hip_shared$score <- -log10(hip_shared$p.adjust)
+##Combine into one table
+library(dplyr)
+
+heat_df <- full_join(
+  ec_shared[, c("ID", "Description", "score")],
+  hip_shared[, c("ID", "score")],
+  by = "ID",
+  suffix = c("_EC", "_HIP")
+)
+#Replace missing values with 0 
+heat_df[is.na(heat_df)] <- 0
+
+#Use description as rownames
+rownames(heat_df) <- heat_df$Description
+heat_matrix <- as.matrix(heat_df[, c("score_EC", "score_HIP")])
+
+#STEP 3 — Create heatmap
+pheatmap(
+  heat_matrix,
+  cluster_rows = TRUE,
+  cluster_cols = FALSE,
+  color = colorRampPalette(c("white", "red"))(100),
+  main = "Shared Pathway Enrichment (EC vs HIP)"
+)
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data16 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/PathwayEnrichmentHeatmap_ECvsHIP.png")
+```
+<img src="`r img_data16`" style="width:70%; display:block; margin:auto;" />
+
+## 6.2. Venn Diagram
+
+#Step 1 — define the two sets
+ec_set  <- ec_genes$ENTREZID
+hip_set <- hip_genes$ENTREZID
+
+#Step 2 — create Venn plot
+venn.plot <- venn.diagram(
+  x = list(
+    EC = ec_set,
+    HIP = hip_set
+  ),
+  filename = NULL,
+  fill = c("steelblue", "tomato"),
+  alpha = 0.5,
+  cex = 1.5,
+  cat.cex = 1.3,
+  cat.pos = 0
+)
+
+#Step 3 — display venn plot
+grid.newpage()
+grid.draw(venn.plot)
+
+```{r, echo=FALSE}
+# This converts your local image into a Base64 string and displays it
+# No external path will be needed after the HTML is generated
+img_data17 <- knitr::image_uri("/Users/mirandapestrofa/Downloads/MultimodalAnalysisAD/ProteomicDatasetAnalysis/VennDiagram-ECvsHIP.png")
+```
+<img src="`r img_data17`" style="width:70%; display:block; margin:auto;" />
+
+
+---
