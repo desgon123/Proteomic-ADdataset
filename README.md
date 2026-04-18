@@ -17,7 +17,7 @@ Single-modality analysis
 
 Motivation
 
-This project was developed to build expertise in proteomic datasets demonstrate the ability to combine heterogeneous biological datasets.
+This project was developed to build expertise in proteomic datasets and demonstrate the ability to combine heterogeneous biological datasets.
 
 
 
